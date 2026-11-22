@@ -124,3 +124,11 @@ Key findings (details in the report):
    are expressed in a speaker-specific way.
 5. t-SNE shows that unseen-speaker emotions still form clean clusters (silhouette 0.37–0.46). The errors come
    from whole clusters being mapped to the wrong label (speaker shift), not from overlapping classes.
+6. **Modality ablation** ([`Results/modality_ablation.md`](Results/modality_ablation.md)): shuffling the text
+   across test clips leaves fusion accuracy unchanged (72.8 → 72.8 %), while shuffling the speech drops it to
+   chance (≈ 13 %). The fusion models use speech only.
+7. **Few-shot recalibration** ([`Results/fewshot_recalibration.md`](Results/fewshot_recalibration.md)): with the
+   encoder frozen, refitting the classifier on **1 labelled clip per emotion** of the new speaker lifts accuracy
+   from 70.5 % to 93.1 % (99.1 % with 5 clips). This confirms the speaker-shift explanation.
+
+Both follow-up experiments: `python Results/extra_experiments.py` (uses the trained checkpoints).

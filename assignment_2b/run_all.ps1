@@ -10,3 +10,4 @@ foreach ($mode in "train", "test") {
     python -m "models.fusion_pipeline.$mode" --fusion concat
 }
 python Results/make_results.py
+python Results/extra_experiments.py
