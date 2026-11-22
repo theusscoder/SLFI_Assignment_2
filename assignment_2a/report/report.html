@@ -1,0 +1,115 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>Assignment 2a Report</title>
+<style>
+@page{size:A4;margin:14mm 14mm}
+body{font-family:"Segoe UI",Arial,sans-serif;color:#1f2430;font-size:10.5pt;line-height:1.45}
+h1{font-size:19pt;margin:0;color:#1d3b8b}
+h2{font-size:13.5pt;color:#1d3b8b;border-bottom:2px solid #d6def5;padding-bottom:2px;margin-top:18px;page-break-after:avoid}
+h3{font-size:11pt;margin:10px 0 3px;color:#2b4fb5;page-break-after:avoid}
+.sub{color:#5a6275;margin:3px 0 10px}
+table{border-collapse:collapse;width:100%;margin:6px 0;font-size:9.5pt;page-break-inside:avoid}
+th,td{border:1px solid #cfd6e6;padding:3px 6px;text-align:left}
+th{background:#e7ecf8}
+tr.hl td{background:#eefaf1;font-weight:600}
+.box{background:#f3f6fd;border-left:4px solid #3b63d6;padding:6px 10px;margin:8px 0;page-break-inside:avoid}
+img{width:100%;border:1px solid #ddd;margin:4px 0}
+figure{margin:6px 0;page-break-inside:avoid}
+figcaption{font-size:8.5pt;color:#5a6275}
+.mono{font-family:Consolas,monospace;font-size:9.5pt}
+.pb{page-break-before:always}
+li{margin:1px 0}
+</style></head><body>
+<h1>Assignment 2a: Forced Alignment with Montreal Forced Aligner</h1>
+<div class="sub">Shridhar Udayagiri · SLFI Speech Processing Lab, LTRC, IIIT Hyderabad · Code, TextGrids and logs: see repository <span class="mono">assignment_2a/</span></div>
+
+<div class="box"><b>Summary.</b> I built a one-command MFA 3.4.3 pipeline for the six provided utterances. It converts the audio, normalizes the transcripts, finds out-of-vocabulary (OOV) words, adds pronunciations for them (G2P plus hand corrections), and runs <b>six experiments</b>: two pretrained acoustic models (<span class="mono">english_us_arpa</span>, <span class="mono">english_mfa</span>), an acoustic model adapted to this corpus, and a learner-pronunciation probe for the ISLE clips. All 6 utterances aligned in every experiment. The custom dictionary removed every unknown-word (<span class="mono">spn</span>) phone. The two acoustic models agree to a 10 ms median. The probe suggests the non-native speaker does not contrast <i>bad</i>/<i>bed</i>, and LPC formant measurements support this.</div>
+
+<h2>1. Data and preparation</h2>
+<table>
+<tr><th>Utterances</th><th>Source</th><th>Duration</th><th>Content</th></tr>
+<tr><td>F2BJRLP1–3</td><td>BU Radio Corpus, speaker f2b (news reading)</td><td>25.3 / 28.7 / 30.7 s</td><td>multi-sentence news story, many proper names</td></tr>
+<tr><td>ISLE_SESS0131_BLOCKD02_01–03</td><td>ISLE non-native English corpus</td><td>4.1 / 3.9 / 4.5 s</td><td>minimal pairs: "I said white not bait", "new not no", "bad not bed"</td></tr>
+</table>
+<p><b>Problem 1: audio format.</b> The three BU files are <b>NIST SPHERE</b> files (header <span class="mono">NIST_1A</span>, 1024-byte header, 16 kHz, 16-bit little-endian PCM) with a <span class="mono">.wav</span> extension. Standard WAV readers reject them. <span class="mono">prepare_data.py</span> parses the SPHERE header and rewrites them as RIFF WAV. The ISLE files were already valid 16 kHz WAV.</p>
+<p><b>Problem 2: transcripts.</b> The BU transcripts contain line breaks, runs of spaces, numbers split across a hyphen (<i>seventy- six</i>), initialisms (<i>S.J.C.'s</i>, <i>WBUR's</i>) and a prefixed word (<i>de-politicize</i>). I normalized them to what was spoken. Initialisms are read letter by letter (<span class="mono">s j c's</span>, <span class="mono">w b u r's</span>), split numbers are joined, and punctuation is removed. Both raw and normalized corpora are kept so the effect can be measured (experiments A vs B).</p>
+
+<h2>2. Dictionaries and G2P (custom dictionary)</h2>
+<table>
+<tr><th>Dictionary</th><th>Size</th><th>OOV on raw text</th><th>OOV on normalized text</th></tr>
+<tr><td>english_us_arpa (ARPAbet)</td><td>199,860</td><td>de-politicize, dukakis, maffy, melnicove, s.j.c.'s, wbur's</td><td>depoliticize, dukakis, maffy, melnicove</td></tr>
+<tr><td>english_us_mfa (IPA-like)</td><td>61,061</td><td>11 words, incl. state's, year's, hennessy's, judgeships, margo</td><td>11 words, incl. the letter possessives c's, r's</td></tr>
+</table>
+<p>OOVs were passed to the matching pretrained G2P model. G2P is clearly weaker on un-normalized input. On the raw token <i>wbur's</i> the ARPA G2P produced <span class="mono">B ER0 Z</span> ("burs"), and on <i>s.j.c.'s</i> it produced <span class="mono">S JH K S</span>. Even on normalized text it made errors, which I corrected by hand (<span class="mono">MANUAL_OVERRIDES</span>):</p>
+<table>
+<tr><th>Word</th><th>G2P output</th><th>Hand-checked</th></tr>
+<tr><td>depoliticize (ARPA)</td><td class="mono">D EH1 P AH0 L AY1 T AH0 S AY2 Z</td><td class="mono">D IY0 P AH0 L IH1 T AH0 S AY2 Z</td></tr>
+<tr><td>dukakis (ARPA)</td><td class="mono">D UW1 K AA1 K IH0 S</td><td class="mono">D UW0 K AA1 K AH0 S</td></tr>
+<tr><td>c's (MFA)</td><td class="mono">kʰ z</td><td class="mono">s iː z</td></tr>
+<tr><td>r's (MFA)</td><td class="mono">ɹ z</td><td class="mono">ɑ ɹ z</td></tr>
+</table>
+<p>The final custom dictionary is the stock dictionary + G2P entries + these overrides. Without it, MFA maps each OOV word to the garbage phone <span class="mono">spn</span>, which spans the whole word with no phone boundaries inside it.</p>
+
+<h2>3. Experiments</h2>
+<p>All runs use <span class="mono">mfa align … --beam 100 --retry_beam 400</span>. The wider beam is needed for the 25–31 s BU utterances.</p>
+<table>
+<tr><th>ID</th><th>Acoustic model</th><th>Text</th><th>Dictionary</th><th>Aligned</th><th>spn phones</th><th>Phones</th><th>% at 30 ms min.</th><th>Mean phone</th></tr>
+<tr><td>A</td><td>english_us_arpa</td><td>raw</td><td>stock</td><td>6/6</td><td>6</td><td>1022</td><td>7.4</td><td>78.9 ms</td></tr>
+<tr><td>B</td><td>english_us_arpa</td><td>normalized</td><td>stock</td><td>6/6</td><td>5</td><td>1031</td><td>7.9</td><td>78.2 ms</td></tr>
+<tr class="hl"><td>C</td><td>english_us_arpa</td><td>normalized</td><td>custom</td><td>6/6</td><td>0</td><td>1063</td><td>7.9</td><td>75.8 ms</td></tr>
+<tr><td>D</td><td>english_mfa</td><td>normalized</td><td>custom (MFA)</td><td>6/6</td><td>0</td><td>1043</td><td>9.3</td><td>82.3 ms</td></tr>
+<tr><td>E</td><td>english_us_arpa adapted on this corpus</td><td>normalized</td><td>custom</td><td>6/6</td><td>0</td><td>1063</td><td>7.8</td><td>75.8 ms</td></tr>
+<tr><td>F</td><td>english_us_arpa</td><td>ISLE only</td><td>learner variants</td><td>3/3</td><td>0</td><td>38</td><td>0.0</td><td>136.6 ms</td></tr>
+</table>
+
+<h3>Agreement between experiments (word boundaries)</h3>
+<p>For each pair of experiments with identical word sequences, I compared every word start/end time.</p>
+<table>
+<tr><th>Pair</th><th>Boundaries</th><th>Mean |Δ|</th><th>Median</th><th>Within 20 ms</th><th>Max</th></tr>
+<tr><td>B (stock dict) vs C (custom dict)</td><td>486</td><td>0.5 ms</td><td>0</td><td>99.2 %</td><td>20 ms</td></tr>
+<tr><td>C (ARPA) vs E (ARPA adapted)</td><td>486</td><td>0.1 ms</td><td>0</td><td>100 %</td><td>10 ms</td></tr>
+<tr><td>C (ARPA) vs D (english_mfa)</td><td>486</td><td>18.5 ms</td><td>10 ms</td><td>90.1 %</td><td>2460 ms</td></tr>
+</table>
+<ul>
+<li><b>Dictionary:</b> fixing the OOVs changes boundaries only around those words (99.2 % unchanged), but it changes <i>what</i> is aligned there: real phones instead of one <span class="mono">spn</span> block.</li>
+<li><b>Adaptation:</b> adapting on ~1.5 min of audio has essentially no effect (0.1 ms). That is far too little data to move the model's Gaussians meaningfully. It is still included as a full adapt→align pipeline.</li>
+<li><b>Two acoustic models:</b> they agree to one 10 ms frame for most boundaries. The large maximum comes from english_mfa extending the <b>last word</b> of short ISLE clips over the trailing silence: <i>bait</i> becomes 2.43 s and <i>bed</i> 3.03 s, against ~0.5 s with ARPA. This is a real alignment error: the model failed to insert a final silence.</li>
+</ul>
+
+<h2 class="pb">4. Alignment visualizations</h2>
+<figure><img src="../results/plots/F2BJRLP1_compare_models.png"><figcaption>Figure 1. F2BJRLP1, 4–7 s: waveform, spectrogram, and word/phone tiers for experiments C (ARPA), D (english_mfa) and E (adapted). Letter-by-letter "s j c's" aligns cleanly. The two models place almost all boundaries within one frame. english_mfa's richer phone set shows a flap [ɾ] in "leader" and an r-colored [ɚ], where ARPA uses D and ER0.</figcaption></figure>
+<figure><img src="../results/plots/ISLE_SESS0131_BLOCKD02_03_sprt1.png"><figcaption>Figure 2. ISLE "I said bad not bed": experiment C (dictionary pronunciation) vs F (learner variants). With variants allowed, the aligner chooses <span class="mono">B EH1 D</span> for "bad". The final /d/ of "bed" is stretched to cover the release and part of the trailing silence (~1.78–2.04 s).</figcaption></figure>
+
+<h2>5. Observations and alignment errors</h2>
+<h3>5.1 Phones squeezed to the minimum duration</h3>
+<p>MFA's HMMs have 3 states with a 10 ms frame shift, so no phone can be shorter than 30 ms. In experiment C, 7.9 % of phones sit exactly at this floor. They are concentrated in the fast news speech and are dominated by <b>T (16) and N (14)</b>, then AH0, R, L and D. Typical cases: <i>important</i> and <i>appointment</i> (N–T clusters), <i>current</i>, <i>seventy</i>, and function words (<i>the</i>, <i>and</i>, <i>it</i>). These are places where the reader reduces or deletes sounds (unreleased /t/, nasalized vowel instead of a full /n/). The aligner must still give every dictionary phone 30 ms, so it <b>steals time from neighbours</b>. Boundaries there are only accurate to about ±30 ms, and the phones may not really be present. english_mfa shows this more often (9.3 %), likely because its phone set is larger.</p>
+<h3>5.2 Missing final silence (english_mfa)</h3>
+<p>In two of three ISLE clips, english_mfa stretched the last word over 2–3 s of silence (see §3). ARPA did not. Short utterances with long trailing silence are a known weak spot. The other model's output or a voice-activity check would catch it.</p>
+<h3>5.3 Forced alignment forces the dictionary pronunciation</h3>
+<p>With a single pronunciation per word, MFA <i>always</i> aligns the canonical phones, even if the speaker said something else. In experiment C, "bad" is aligned as <span class="mono">B AE1 D</span> regardless of what was said. To test this, experiment F gives each ISLE target word typical learner variants (e.g. <i>bad</i>: <span class="mono">B AE1 D | B EH1 D | B AE1 T</span>; <i>new</i>: <span class="mono">N UW1 | N Y UW1 | N OW1</span>) and lets the aligner choose.</p>
+<table>
+<tr><th>Clip</th><th>Word</th><th>Chosen variant (F)</th><th>F1/F2 at 30 % → 50 % → 70 % (Hz)</th></tr>
+<tr><td>01</td><td>white</td><td class="mono">W AY1 T</td><td>623/1227 → 630/1404 → 717/1693 (diphthong glide)</td></tr>
+<tr><td>01</td><td>bait</td><td class="mono">B EY1 T</td><td>523/1712 → 421/1896 → 324/2051 (diphthong glide)</td></tr>
+<tr><td>02</td><td>new</td><td class="mono">N Y UW1</td><td>319/1417 → 288/2336 → 301/2160 (fronted /u/)</td></tr>
+<tr><td>02</td><td>no</td><td class="mono">N OW1</td><td>391/961 → 389/854 → 262/705 (back vowel)</td></tr>
+<tr class="hl"><td>03</td><td>bad</td><td class="mono">B EH1 D</td><td>514/1808 → 600/1773 → 629/1613</td></tr>
+<tr class="hl"><td>03</td><td>bed</td><td class="mono">B EH1 D</td><td>521/1903 → 533/1846 → 571/1760</td></tr>
+</table>
+<p>Formants were measured with my own LPC implementation (resampled to 11 kHz, order 12, 25 ms frames), matching Praat's default 5.5 kHz ceiling. The <i>bad</i>/<i>bed</i> vowels differ by only ~60 Hz in F1. A native /æ/ is typically 150–300 Hz more open than /ɛ/. The acoustic evidence and the aligner's choice agree: <b>this learner does not clearly realize the /æ/–/ɛ/ contrast</b>, a common difficulty for L2 English speakers. The other pairs are realized as intended. <i>Caveat:</i> one token per word, and the speaker's sex is unknown, so this is suggestive rather than conclusive. It does show how forced alignment with pronunciation variants can serve as a simple mispronunciation detector.</p>
+<h3>5.4 Effect of text normalization</h3>
+<p>MFA's own tokenizer already handles line breaks and most punctuation, so A and B align identically on the shared words. The real gain is on the six problem tokens: without normalization they become OOVs, and G2P on <i>wbur's</i>/<i>s.j.c.'s</i> gives unusable pronunciations.</p>
+
+<h2>6. Extra credit covered</h2>
+<ul>
+<li><b>Custom dictionary:</b> OOV detection per dictionary, G2P with two G2P models, and hand-corrected entries.</li>
+<li><b>Multiple acoustic models:</b> english_us_arpa vs english_mfa, plus a corpus-adapted model (<span class="mono">mfa adapt</span>).</li>
+<li><b>Automation:</b> <span class="mono">python scripts/run_pipeline.py</span> runs everything from the raw provided files to tables and plots. Every MFA call is logged.</li>
+<li><b>Beyond the brief:</b> quantitative model-agreement metrics, minimum-duration diagnostics, and a learner-variant probe validated with formant analysis.</li>
+</ul>
+<h2>7. Limitations</h2>
+<ul>
+<li>There is no manually annotated reference alignment, so agreement between models is a proxy for accuracy, not a measure of it.</li>
+<li>Adaptation and the ISLE probe use very little data (about 1.5 min and 6 target words).</li>
+<li>Phones are quantized to 10 ms frames with a 30 ms minimum, which limits boundary precision in fast speech.</li>
+</ul>
+</body></html>

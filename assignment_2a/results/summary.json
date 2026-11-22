@@ -1,0 +1,72 @@
+{
+  "A_arpa_rawtext_basedict": {
+    "utterances_aligned": "6/6",
+    "missing": [],
+    "words": 241,
+    "unknown_words": 0,
+    "spn_phones": 6,
+    "phones": 1022,
+    "min_duration_phones_pct": 7.4,
+    "long_phones": 7,
+    "mean_phone_ms": 78.9
+  },
+  "B_arpa_normtext_basedict": {
+    "utterances_aligned": "6/6",
+    "missing": [],
+    "words": 243,
+    "unknown_words": 0,
+    "spn_phones": 5,
+    "phones": 1031,
+    "min_duration_phones_pct": 7.9,
+    "long_phones": 6,
+    "mean_phone_ms": 78.2
+  },
+  "C_arpa_normtext_g2pdict": {
+    "utterances_aligned": "6/6",
+    "missing": [],
+    "words": 243,
+    "unknown_words": 0,
+    "spn_phones": 0,
+    "phones": 1063,
+    "min_duration_phones_pct": 7.9,
+    "long_phones": 1,
+    "mean_phone_ms": 75.8
+  },
+  "D_mfa_normtext_g2pdict": {
+    "utterances_aligned": "6/6",
+    "missing": [],
+    "words": 243,
+    "unknown_words": 0,
+    "spn_phones": 0,
+    "phones": 1043,
+    "min_duration_phones_pct": 9.3,
+    "long_phones": 5,
+    "mean_phone_ms": 82.3
+  },
+  "E_arpa_adapted_g2pdict": {
+    "utterances_aligned": "6/6",
+    "missing": [],
+    "words": 243,
+    "unknown_words": 0,
+    "spn_phones": 0,
+    "phones": 1063,
+    "min_duration_phones_pct": 7.8,
+    "long_phones": 1,
+    "mean_phone_ms": 75.8
+  },
+  "F_isle_learner_variants": {
+    "utterances_aligned": "3/6",
+    "missing": [
+      "F2BJRLP1",
+      "F2BJRLP2",
+      "F2BJRLP3"
+    ],
+    "words": 15,
+    "unknown_words": 0,
+    "spn_phones": 0,
+    "phones": 38,
+    "min_duration_phones_pct": 0.0,
+    "long_phones": 2,
+    "mean_phone_ms": 136.6
+  }
+}

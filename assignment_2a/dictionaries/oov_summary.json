@@ -1,0 +1,83 @@
+{
+  "arpa": {
+    "base_dictionary": "english_us_arpa",
+    "base_size": 199860,
+    "oov_raw_text": [
+      "de-politicize",
+      "dukakis",
+      "maffy",
+      "melnicove",
+      "s.j.c.'s",
+      "wbur's"
+    ],
+    "oov_normalized_text": [
+      "depoliticize",
+      "dukakis",
+      "maffy",
+      "melnicove"
+    ],
+    "g2p_pronunciations": {
+      "depoliticize": "D EH1 P AH0 L AY1 T AH0 S AY2 Z",
+      "dukakis": "D UW1 K AA1 K IH0 S",
+      "maffy": "M AE1 F IY0",
+      "melnicove": "M EH1 L N IH0 K OW2 V",
+      "sjc's": "S JH K S",
+      "wbur's": "B ER0 Z"
+    },
+    "manual_overrides": {
+      "depoliticize": "D IY0 P AH0 L IH1 T AH0 S AY2 Z",
+      "dukakis": "D UW0 K AA1 K AH0 S"
+    }
+  },
+  "mfa": {
+    "base_dictionary": "english_us_mfa",
+    "base_size": 61061,
+    "oov_raw_text": [
+      "de-politicize",
+      "dukakis",
+      "hennessy's",
+      "judgeships",
+      "maffy",
+      "margo",
+      "melnicove",
+      "s.j.c.'s",
+      "state's",
+      "wbur's",
+      "year's"
+    ],
+    "oov_normalized_text": [
+      "c's",
+      "depoliticize",
+      "dukakis",
+      "hennessy's",
+      "judgeships",
+      "maffy",
+      "margo",
+      "melnicove",
+      "r's",
+      "state's",
+      "year's"
+    ],
+    "g2p_pronunciations": {
+      "c's": "k\u02b0 z",
+      "depoliticize": "d\u02b2 i\u02d0 p \u0259 \u028e \u026a t\u02b2 \u026a s aj z",
+      "dukakis": "d \u0250 c\u02b0 \u00e6 c \u026a s",
+      "hennessy's": "h \u025b \u0272 \u026a s i z",
+      "judgeships": "d\u0292 \u0250 d\u0292 \u0283 \u026a p s",
+      "maffy": "m \u00e6 f\u02b2 i",
+      "margo": "m \u0251 \u0279 \u0261 ow",
+      "melnicove": "m \u025b \u026b \u0272 \u026a k\u02b0 ow v",
+      "r's": "\u0279 z",
+      "sjc's": "s d\u0292 ej s i\u02d0 z",
+      "state's": "s t ej t z",
+      "wbur's": "\u0289\u02d0 b \u0279 z",
+      "year's": "j \u025d z"
+    },
+    "manual_overrides": {
+      "c's": "s i\u02d0 z",
+      "r's": "\u0251 \u0279 z",
+      "depoliticize": "d i p \u0259 l \u026a t \u0259 s aj z",
+      "dukakis": "d u k \u0251 k \u0259 s"
+    }
+  }
+}

@@ -1,0 +1,7 @@
+__pycache__/
+*.pyc
+assignment_2a/work/
+assignment_2b/data/
+assignment_2b/cache/
+assignment_2b/runs/**/model.pt
+assignment_2b/runs/**/test_outputs.npz
