@@ -5,3 +5,5 @@ assignment_2b/data/
 assignment_2b/cache/
 assignment_2b/runs/**/model.pt
 assignment_2b/runs/**/test_outputs.npz
+assignment_2b/*_log.txt
+assignment_2b/data/file_list.txt

@@ -1,0 +1,12 @@
+# Python 3.11. For GPU, install torch first from the CUDA index:
+#   pip install torch==2.5.1 torchaudio==2.5.1 --index-url https://download.pytorch.org/whl/cu121
+torch==2.5.1
+torchaudio==2.5.1
+transformers==4.46.3
+scikit-learn
+pandas
+numpy
+matplotlib
+librosa
+soundfile
+tqdm

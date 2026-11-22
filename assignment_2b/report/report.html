@@ -1,0 +1,141 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>Assignment 2b Report</title>
+<style>
+@page{size:A4;margin:14mm}
+body{font-family:"Segoe UI",Arial,sans-serif;color:#1f2430;font-size:10.3pt;line-height:1.45}
+h1{font-size:19pt;margin:0;color:#1d3b8b}
+h2{font-size:13.5pt;color:#1d3b8b;border-bottom:2px solid #d6def5;padding-bottom:2px;margin-top:16px;page-break-after:avoid}
+h3{font-size:11pt;margin:9px 0 3px;color:#2b4fb5;page-break-after:avoid}
+.sub{color:#5a6275;margin:3px 0 10px}
+table{border-collapse:collapse;width:100%;margin:6px 0;font-size:9.3pt;page-break-inside:avoid}
+th,td{border:1px solid #cfd6e6;padding:3px 6px;text-align:left;vertical-align:top}
+th{background:#e7ecf8}
+tr.hl td{background:#eefaf1;font-weight:600}
+.box{background:#f3f6fd;border-left:4px solid #3b63d6;padding:6px 10px;margin:8px 0;page-break-inside:avoid}
+img{width:100%;border:1px solid #ddd;margin:3px 0}
+figure{margin:6px 0;page-break-inside:avoid}
+figcaption{font-size:8.5pt;color:#5a6275}
+.two{display:flex;gap:8px}.two figure{flex:1}
+.mono{font-family:Consolas,monospace;font-size:9pt}
+.pb{page-break-before:always}
+li{margin:1px 0}
+</style></head><body>
+<h1>Assignment 2b: Multimodal Emotion Recognition on TESS</h1>
+<div class="sub">Shridhar Udayagiri · SLFI Speech Processing Lab, LTRC, IIIT Hyderabad · Code and results: repository <span class="mono">assignment_2b/</span></div>
+
+<div class="box"><b>Summary.</b> I built speech-only, text-only and multimodal emotion classifiers from the five functional blocks, and evaluated 5 model variants under 4 split protocols × 3 seeds (60 runs).
+<b>(1)</b> On a random split every speech model reaches ≈100 %. That benchmark is saturated because TESS has only two speakers.
+<b>(2)</b> TESS transcripts are always "Say the word X", with each word recorded in all 7 emotions, so <b>text-only is exactly at chance (14.3 %)</b>.
+<b>(3)</b> On <b>unseen-speaker</b> tests, pretrained WavLM features reach 70.5 / 57.1 % versus 47.2 / 33.1 % for log-mel. Gated fusion adds a small +2–4 points, but the model in effect ignores the text.
+<b>(4)</b> Errors come from <i>speaker shift</i>: a new speaker's emotions still form clean clusters, but some whole clusters (happy, angry) are mapped to the wrong label.</div>
+
+<h2>1. Dataset and evaluation design</h2>
+<p>TESS has 2,800 clips: 2 actresses (OAF, aged 64; YAF, aged 26) × 200 target words × 7 emotions (angry, disgust, fear, happy, neutral, pleasant surprise, sad). It is perfectly balanced (200 clips per speaker and emotion). All clips were downloaded from the University of Toronto Dataverse. One file is mis-named in the release (<span class="mono">OA_bite_neutral.wav</span>), and the loader handles it. Audio is 24,414 Hz mono. The transcript is reconstructed from the file name as <i>"Say the word &lt;word&gt;"</i>.</p>
+<p>A random split puts both the same speaker and the same word in train and test, so I evaluate four protocols:</p>
+<table>
+<tr><th>Split</th><th>Train / val</th><th>Test</th><th>Question it answers</th></tr>
+<tr><td>Random</td><td>80 / 10 % (stratified by speaker × emotion)</td><td>10 %</td><td>Standard benchmark, but optimistic</td></tr>
+<tr><td>Speaker OAF→YAF</td><td>OAF (90 / 10 %)</td><td>all 1,400 YAF clips</td><td>Does it work for an unseen speaker?</td></tr>
+<tr><td>Speaker YAF→OAF</td><td>YAF</td><td>all 1,400 OAF clips</td><td>The reverse direction (young → older voice)</td></tr>
+<tr><td>Word-disjoint</td><td>70 % / 10 % of words</td><td>20 % of words (never seen)</td><td>Does it rely on the lexical content?</td></tr>
+</table>
+
+<h2>2. Architecture decisions (block by block)</h2>
+<table>
+<tr><th style="width:15%">Block</th><th style="width:42%">Speech</th><th style="width:43%">Text</th></tr>
+<tr><td><b>1. Preprocessing</b></td>
+<td>Resample 24.4 → <b>16 kHz</b> mono (what WavLM was trained on). <b>Trim</b> leading/trailing silence (<span class="mono">top_db = 30</span>) so the model sees speech, not recording pauses. <b>Peak-normalize</b> to remove loudness differences between sessions. <b>Crop to 3 s</b> (longer than any trimmed clip) for a fixed memory budget; variable lengths are handled by padding and masks, not stretching.</td>
+<td>Lower-case and WordPiece-tokenize with the BERT tokenizer (<span class="mono">[CLS] say the word … [SEP]</span>, 6–8 tokens). No stop-word removal: the sentence is already minimal, and BERT expects natural text.</td></tr>
+<tr><td><b>2. Feature extraction</b><br>(time × features)</td>
+<td><b>Frozen WavLM-Base+, layer 9</b> → (≈50 frames/s × 768). WavLM is pre-trained with denoising on 94k hours of speech. Its mid-upper layers carry prosodic and speaker-independent paralinguistic information, which is what transfers to an unseen speaker. Freezing it avoids over-fitting 2,800 clips. <b>Baseline: 80-band log-mel</b> (100 frames/s × 80), the classic hand-crafted input, to measure what pre-training adds.</td>
+<td><b>Frozen bert-base-uncased</b>, last layer → (tokens × 768). These are contextual embeddings: if the text carried emotional words, they would be encoded here.</td></tr>
+<tr><td><b>3. Temporal / contextual modelling</b></td>
+<td>Linear 768→256, then a <b>2-layer bidirectional GRU</b>, then <b>attention pooling</b>. The GRU models how pitch, energy and voice quality <i>evolve</i> over the utterance. Attention pooling learns to weight the emotionally salient frames: in TESS that is the stressed target word, not the carrier phrase. A GRU suits sequences of about 150 frames and has fewer parameters than a Transformer for 2.2k training clips.</td>
+<td>Linear 768→256, then a <b>2-layer Transformer encoder</b> (4 heads), then masked mean pooling. Self-attention models each token in the context of the whole sentence, which is the natural choice for text. Sequences are short, so cost is negligible.</td></tr>
+<tr><td><b>4. Fusion</b></td>
+<td colspan="2"><b>Gated fusion:</b> <span class="mono">g = σ(W[s; t])</span>, <span class="mono">f = g ⊙ s + (1 − g) ⊙ t</span>, followed by a linear+GELU+LayerNorm layer. The gate is computed per example and per dimension, so the model can learn <i>how much to trust each modality</i>, which matters when one modality is uninformative, as here. The gate value is also interpretable. <b>Baseline: concatenation + projection</b>. Both encoders are trained jointly with the fusion layer, end to end.</td></tr>
+<tr><td><b>5. Classifier</b></td>
+<td colspan="2">MLP 256 → 256 → 7 (GELU, dropout 0.3), softmax with cross-entropy and label smoothing 0.05. A small head keeps the representations from blocks 3–4 doing the discriminative work, so the cluster plots in §4.4 reflect the learned features.</td></tr>
+</table>
+<p><b>Training:</b> AdamW (lr 3e-4, wd 0.01), one-cycle LR, batch 32, up to 40 epochs, early stopping on validation accuracy (patience 8), random time-crop augmentation for speech, 3 seeds per configuration. Features are extracted once and cached, so the full 60-run sweep takes about 25 min on an RTX 4050 laptop GPU.</p>
+
+<h2 class="pb">3. Experiments: speech-only vs text-only vs multimodal</h2>
+<table>
+<tr><th>Model</th><th>Random</th><th>Speaker OAF→YAF</th><th>Speaker YAF→OAF</th><th>Word-disjoint</th></tr>
+<tr><td>Speech: log-mel + BiGRU</td><td>99.8 ± 0.2</td><td>47.2 ± 1.5</td><td>33.1 ± 3.7</td><td>99.8 ± 0.2</td></tr>
+<tr><td>Speech: WavLM + BiGRU</td><td>99.9 ± 0.2</td><td>70.5 ± 4.4</td><td>57.1 ± 6.5</td><td>99.5 ± 0.6</td></tr>
+<tr><td>Text: BERT + Transformer</td><td>13.3 ± 2.0</td><td>14.3 ± 0.0</td><td>14.3 ± 0.0</td><td>14.3 ± 0.0</td></tr>
+<tr><td>Fusion: concatenation</td><td>100.0 ± 0.0</td><td>66.6 ± 6.6</td><td>57.2 ± 1.6</td><td>99.9 ± 0.1</td></tr>
+<tr class="hl"><td>Fusion: gated</td><td>99.4 ± 0.5</td><td>72.8 ± 4.6</td><td>60.8 ± 1.6</td><td>99.8 ± 0.2</td></tr>
+</table>
+<div style="font-size:8.5pt;color:#5a6275">Test accuracy (%), mean ± std over 3 seeds. Macro-F1 follows the same ranking (Results/accuracy_tables.md). Chance = 14.3 %.</div>
+<figure><img src="../Results/plots/accuracy_by_split.png"><figcaption>Figure 1. Accuracy of all variants under the four protocols.</figcaption></figure>
+<ul>
+<li><b>The random and word-disjoint splits are saturated.</b> They cannot distinguish models, and word-disjoint ≈ random confirms the speech models do not use the lexical content.</li>
+<li><b>Speaker-independent splits are the informative ones.</b> Pre-trained WavLM features add <b>+23 to +24 points</b> over log-mel: log-mel models learn OAF's or YAF's specific voice. YAF→OAF is harder than OAF→YAF for every model. A young voice is a worse "teacher" for an older voice than the reverse, and with only one training speaker the model cannot separate speaker from emotion.</li>
+<li><b>Text-only is at chance.</b> Its predictions collapse onto one or two classes (per-class recall 0–33 %), as expected when input and label are independent.</li>
+<li><b>Gated fusion is the best model</b> on both speaker splits, but the gain over speech-only (+2.3, +3.7) is within about one standard deviation. Concatenation is not better than speech-only.</li>
+</ul>
+
+<h2>4. Analysis</h2>
+<h3>4.1 Which emotions are easiest / hardest?</h3>
+<table>
+<tr><th>Recall (%) on the unseen speaker</th><th>angry</th><th>disgust</th><th>fear</th><th>happy</th><th>neutral</th><th>p. surprise</th><th>sad</th></tr>
+<tr><td>WavLM speech, OAF→YAF</td><td>23</td><td>93</td><td>100</td><td>21</td><td>100</td><td>94</td><td>63</td></tr>
+<tr><td>Gated fusion, OAF→YAF</td><td>29</td><td>94</td><td>100</td><td>18</td><td>99</td><td>89</td><td>80</td></tr>
+<tr><td>WavLM speech, YAF→OAF</td><td>17</td><td>80</td><td>99</td><td>8</td><td>73</td><td>40</td><td>83</td></tr>
+<tr><td>Gated fusion, YAF→OAF</td><td>22</td><td>88</td><td>98</td><td>8</td><td>71</td><td>50</td><td>88</td></tr>
+</table>
+<p>On the random split, all classes are ≥ 98 %. <b>Easiest across speakers: fear (≈100 %), disgust, neutral.</b> These have distinctive acoustic signatures that both actresses share: breathy, trembling high-pitched voice for fear; flat, low-energy delivery for neutral; a characteristic creaky, drawn-out delivery for disgust. <b>Hardest: happy (8–21 %) and angry (17–29 %).</b> Both are <i>high-arousal</i> emotions (raised pitch, energy and tempo). They differ mainly in <i>valence</i>, which is carried by subtler, speaker-specific cues such as voice quality and smile-related formant shifts. In the error analysis, <i>happy → angry</i> is the single most frequent confusion (77 of 335 errors). Pleasant surprise suffers similarly when testing on OAF (40–50 %): it is confused with happy, the other positive high-arousal class.</p>
+
+<div class="two">
+<figure><img src="../Results/plots/confusion_speech_wavlm_speaker_oaf2yaf.png"><figcaption>Figure 2a. WavLM speech-only, OAF→YAF.</figcaption></figure>
+<figure><img src="../Results/plots/confusion_fusion_gated_wavlm_speaker_oaf2yaf.png"><figcaption>Figure 2b. Gated fusion, OAF→YAF.</figcaption></figure>
+</div>
+
+<h3>4.2 When does fusion help most?</h3>
+<p><b>In TESS, fusion helps only marginally, and not because of the text.</b> Three measurements show this:</p>
+<ul>
+<li>The text encoder's output is nearly constant. Its per-dimension standard deviation across test clips is 0.057, against 0.757 for the speech encoder (13× smaller), and its emotion clusters have silhouette ≈ 0.</li>
+<li>The fusion gate is almost constant at 0.61 ± 0.01. With a constant text vector, the text branch acts as a <i>learned bias</i>, not as information.</li>
+<li>The small gain therefore comes from the extra gating layer acting as a regularizer. It is largest where speech alone is least reliable (the hardest split, YAF→OAF: +3.7, with the seed-to-seed std falling from 6.5 to 1.6).</li>
+</ul>
+<p><b>When fusion <i>would</i> help most:</b> when the two modalities carry complementary information. That happens when the words themselves express emotion ("I'm furious", "this is wonderful"), or when the acoustic cue is ambiguous between two classes that the text separates (e.g. happy vs angry, our hardest pair: same arousal, opposite valence, and valence is exactly what lexical content conveys well). On conversational corpora such as IEMOCAP or MELD, text-only models perform far above chance and fusion typically gives clear gains. The gated design used here is chosen for that case: it learns to rely on text when text is informative and to fall back to speech when it is not, as it did here.</p>
+
+<h3 class="pb">4.3 Error analysis: failure cases</h3>
+<p>The five most confident errors of the gated fusion model (OAF→YAF, seed 0; 335 errors in 1,400):</p>
+<table>
+<tr><th>Clip</th><th>True</th><th>Predicted</th><th>p(pred)</th><th>p(true)</th><th>Likely cause</th></tr>
+<tr><td>YAF_raid_happy</td><td>happy</td><td>angry</td><td>0.98</td><td>0.01</td><td rowspan="4">YAF's happy voice is louder, higher and faster than OAF's. Those are the cues the model learned as <i>angry</i> from OAF. The prediction is confidently wrong: a systematic speaker shift, not noise.</td></tr>
+<tr><td>YAF_pad_happy</td><td>happy</td><td>angry</td><td>0.97</td><td>0.01</td></tr>
+<tr><td>YAF_dab_happy</td><td>happy</td><td>angry</td><td>0.97</td><td>0.01</td></tr>
+<tr><td>YAF_raise_happy</td><td>happy</td><td>angry</td><td>0.96</td><td>0.01</td></tr>
+<tr><td>YAF_thought_angry</td><td>angry</td><td>disgust</td><td>0.96</td><td>0.00</td><td>The word "thought" is long and voiced. YAF's angry delivery of it is drawn out, like OAF's disgust, so tempo rather than energy drove the decision.</td></tr>
+</table>
+<p>Most frequent confusions: happy → angry (77), angry → disgust (59), happy → fear (46), angry → sad (33), sad → fear (30), pleasant surprise → happy (23). All five top errors have p(true) ≤ 0.01. Confident errors like this mean the model needs <b>speaker adaptation</b> (per-speaker feature normalization, a few labelled clips from the new speaker, or more training speakers), not more capacity.</p>
+
+<h3>4.4 Separability of the learned representations</h3>
+<figure><img src="../Results/plots/tsne_speaker_oaf2yaf.png"><figcaption>Figure 3. t-SNE of the pooled output of each block on the unseen-speaker test set (OAF→YAF, seed 0), coloured by true emotion, with silhouette scores computed in the original 256-dim space.</figcaption></figure>
+<table>
+<tr><th>Representation</th><th>Silhouette</th></tr>
+<tr><td>Temporal block, speech-only (log-mel)</td><td>0.32</td></tr>
+<tr><td>Temporal block, speech-only (WavLM)</td><td>0.37</td></tr>
+<tr><td>Temporal block inside the gated fusion model</td><td>0.38</td></tr>
+<tr><td>Contextual block (text), text-only and inside fusion</td><td>−0.01 to 0.00</td></tr>
+<tr class="hl"><td>Fusion block (gated / concat)</td><td>0.43 / 0.46</td></tr>
+</table>
+<ul>
+<li><b>Temporal modelling block:</b> the unseen speaker's clips form <b>seven compact, well-separated clusters</b>. The representation separates emotions even for a new voice.</li>
+<li><b>Contextual modelling block:</b> one shapeless cloud with all emotions mixed. The text representation contains no emotion structure.</li>
+<li><b>Fusion block:</b> the clusters are the most compact (highest silhouette), consistent with the regularizing effect in §4.2.</li>
+<li><b>Key insight:</b> separability ≈ 0.4 while accuracy is about 70 %. The clusters are clean but some sit where a <i>different</i> emotion was for the training speaker, e.g. YAF's happy cluster is classified as angry. The classifier boundary, not the representation, fails to transfer. This is why per-speaker normalization or a few adaptation samples would likely recover most of the gap.</li>
+</ul>
+
+<h2>5. Conclusions and limitations</h2>
+<ul>
+<li>Random-split accuracy on TESS (≈100 %) says little. Speaker-independent evaluation shows the real gap (57–73 %), and pre-trained self-supervised features (WavLM) are the single biggest improvement.</li>
+<li>TESS text is emotion-neutral by design, so text-only is at chance and multimodal fusion cannot gain real information. The gated fusion model correctly learns to treat text as a constant bias.</li>
+<li>Limitations: only two speakers (speaker-independent results rest on one training speaker), so standard deviations are large. The encoders' upstream models are frozen. Fusion's benefit can only be properly tested on a corpus whose text is emotional.</li>
+<li>Next steps: per-speaker normalization or adaptation, fine-tuning the upper WavLM layers, and evaluating the same pipelines on a corpus with emotional text (e.g. IEMOCAP) to test fusion where it should matter.</li>
+</ul>
+</body></html>
