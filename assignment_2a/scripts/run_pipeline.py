@@ -175,6 +175,18 @@ def adapt_and_align():
     align("E_arpa_adapted_g2pdict", WORK / "corpus_norm", DICTS / "custom_arpa.dict", model)
 
 
+def train_from_scratch():
+    """Train an acoustic model on only these 6 files (~97 s) and align with it.
+
+    Shows how much the pretrained models' thousands of hours of speech matter.
+    """
+    model = WORK / "scratch_arpa.zip"
+    run(["mfa", "train", WORK / "corpus_norm", DICTS / "custom_arpa.dict", model,
+         "--clean", "--no_use_mp", "--num_jobs", "1", "--output_directory", OUT / "G_scratch_trained_g2pdict",
+         "--output_format", "long_textgrid"],
+        log=OUT / "logs" / "train_scratch.log")
+
+
 def isle_probe():
     corpus = WORK / "corpus_isle"
     if corpus.exists():
@@ -203,6 +215,7 @@ def main():
         align(name, WORK / corpus, dictionary_for(set_name, use_g2p), MODEL_SETS[set_name][0])
     if not args.skip_adapt:
         adapt_and_align()
+    train_from_scratch()
     isle_probe()
     run([sys.executable, ROOT / "scripts" / "analyze.py"])
 

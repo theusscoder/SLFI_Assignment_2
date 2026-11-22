@@ -6,3 +6,4 @@
 | D_mfa_normtext_g2pdict | 6/6 | [] | 243 | 0 | 0 | 1043 | 9.3 | 5 | 82.3 |
 | E_arpa_adapted_g2pdict | 6/6 | [] | 243 | 0 | 0 | 1063 | 7.8 | 1 | 75.8 |
 | F_isle_learner_variants | 3/6 | ['F2BJRLP1', 'F2BJRLP2', 'F2BJRLP3'] | 15 | 0 | 0 | 38 | 0.0 | 2 | 136.6 |
+| G_scratch_trained_g2pdict | 6/6 | [] | 243 | 0 | 0 | 1055 | 66.2 | 51 | 69.8 |

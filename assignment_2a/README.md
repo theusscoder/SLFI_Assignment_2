@@ -20,11 +20,14 @@ plus an adapted model, and writes the analysis tables and plots.
 | D | english_mfa | normalized | stock + G2P + manual | 0 |
 | E | english_us_arpa **adapted** on this corpus | normalized | stock + G2P + manual | 0 |
 | F | english_us_arpa (ISLE only) | normalized | learner pronunciation variants | 0 |
+| G | **trained from scratch** on the 6 files (`mfa train`) | normalized | stock + G2P + manual | 0 |
 
 - All 6 utterances aligned in every experiment.
 - ARPA vs english_mfa word boundaries: median difference 10 ms, 90 % within 20 ms. english_mfa
   stretches the last word of the short ISLE clips over the trailing silence (up to 2.4 s).
 - Adaptation on ~1.5 min of audio changes boundaries by only 0.1 ms on average.
+- A model trained from scratch on the same ~97 s "succeeds" on all files but is unusable: 66 % of phones sit at
+  the 30 ms minimum and word boundaries are a median 730 ms off the pretrained model's.
 - Learner probe: given both options, the aligner picks **"bed" (`B EH1 D`) for "bad"**. LPC formants agree:
   the two vowels differ by only ~60 Hz in F1 (native /æ/–/ɛ/ differ by ~150–300 Hz).
 
@@ -103,6 +106,10 @@ mfa align work/corpus_norm dictionaries/custom_arpa.dict english_us_arpa outputs
 
 # adapt the acoustic model to this corpus, then align with it
 mfa adapt work/corpus_norm dictionaries/custom_arpa.dict english_us_arpa work/english_us_arpa_adapted.zip
+
+# train an acoustic model from scratch on the corpus and align with it in one step
+mfa train work/corpus_norm dictionaries/custom_arpa.dict work/scratch_arpa.zip \
+    --output_directory outputs/G_scratch_trained_g2pdict --output_format long_textgrid
 ```
 
 To re-run only the analysis: `python scripts/analyze.py`.

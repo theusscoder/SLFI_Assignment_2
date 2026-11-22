@@ -59,6 +59,7 @@ li{margin:1px 0}
 <tr><td>D</td><td>english_mfa</td><td>normalized</td><td>custom (MFA)</td><td>6/6</td><td>0</td><td>1043</td><td>9.3</td><td>82.3 ms</td></tr>
 <tr><td>E</td><td>english_us_arpa adapted on this corpus</td><td>normalized</td><td>custom</td><td>6/6</td><td>0</td><td>1063</td><td>7.8</td><td>75.8 ms</td></tr>
 <tr><td>F</td><td>english_us_arpa</td><td>ISLE only</td><td>learner variants</td><td>3/3</td><td>0</td><td>38</td><td>0.0</td><td>136.6 ms</td></tr>
+<tr><td>G</td><td><b>trained from scratch</b> on these 6 files (<span class="mono">mfa train</span>)</td><td>normalized</td><td>custom</td><td>6/6</td><td>0</td><td>1055</td><td><b>66.2</b></td><td>69.8 ms</td></tr>
 </table>
 
 <h3>Agreement between experiments (word boundaries)</h3>
@@ -68,6 +69,7 @@ li{margin:1px 0}
 <tr><td>B (stock dict) vs C (custom dict)</td><td>486</td><td>0.5 ms</td><td>0</td><td>99.2 %</td><td>20 ms</td></tr>
 <tr><td>C (ARPA) vs E (ARPA adapted)</td><td>486</td><td>0.1 ms</td><td>0</td><td>100 %</td><td>10 ms</td></tr>
 <tr><td>C (ARPA) vs D (english_mfa)</td><td>486</td><td>18.5 ms</td><td>10 ms</td><td>90.1 %</td><td>2460 ms</td></tr>
+<tr><td>C (ARPA) vs G (trained from scratch)</td><td>486</td><td>826.5 ms</td><td>730 ms</td><td>1.4 %</td><td>3010 ms</td></tr>
 </table>
 <ul>
 <li><b>Dictionary:</b> fixing the OOVs changes boundaries only around those words (99.2 % unchanged), but it changes <i>what</i> is aligned there: real phones instead of one <span class="mono">spn</span> block.</li>
@@ -75,8 +77,11 @@ li{margin:1px 0}
 <li><b>Two acoustic models:</b> they agree to one 10 ms frame for most boundaries. The large maximum comes from english_mfa extending the <b>last word</b> of short ISLE clips over the trailing silence: <i>bait</i> becomes 2.43 s and <i>bed</i> 3.03 s, against ~0.5 s with ARPA. This is a real alignment error: the model failed to insert a final silence.</li>
 </ul>
 
+<ul><li><b>Acoustic model trained from scratch:</b> MFA can train a full monophone → triphone → speaker-adapted model on the corpus itself, but here that is only ~97 s of speech from two speakers. The result aligns every file without error, yet it is unusable. 66 % of its phones collapse to the 30 ms minimum, a few phones are stretched over whole words, and its word boundaries are a median <b>730 ms</b> away from the pretrained model's (only 1.4 % within 20 ms). Figure 1b shows it running more than a second behind the speech. A "successful" alignment run is not evidence of a correct alignment, and pretrained models trained on thousands of hours are essential for small corpora like this one.</li></ul>
+
 <h2 class="pb">4. Alignment visualizations</h2>
 <figure><img src="../results/plots/F2BJRLP1_compare_models.png"><figcaption>Figure 1. F2BJRLP1, 4–7 s: waveform, spectrogram, and word/phone tiers for experiments C (ARPA), D (english_mfa) and E (adapted). Letter-by-letter "s j c's" aligns cleanly. The two models place almost all boundaries within one frame. english_mfa's richer phone set shows a flap [ɾ] in "leader" and an r-colored [ɚ], where ARPA uses D and ER0.</figcaption></figure>
+<figure><img src="../results/plots/F2BJRLP1_pretrained_vs_scratch.png"><figcaption>Figure 1b. The same 4–7 s window: pretrained ARPA (C) vs a model trained from scratch on the 6 files (G). G's word tier runs about 1.2 s behind (it places "j" and "c's" where the speaker says "april" and "the"), and its phones are mostly at the 30 ms floor.</figcaption></figure>
 <figure><img src="../results/plots/ISLE_SESS0131_BLOCKD02_03_sprt1.png"><figcaption>Figure 2. ISLE "I said bad not bed": experiment C (dictionary pronunciation) vs F (learner variants). With variants allowed, the aligner chooses <span class="mono">B EH1 D</span> for "bad". The final /d/ of "bed" is stretched to cover the release and part of the trailing silence (~1.78–2.04 s).</figcaption></figure>
 
 <h2>5. Observations and alignment errors</h2>
@@ -102,7 +107,7 @@ li{margin:1px 0}
 <h2>6. Extra credit covered</h2>
 <ul>
 <li><b>Custom dictionary:</b> OOV detection per dictionary, G2P with two G2P models, and hand-corrected entries.</li>
-<li><b>Multiple acoustic models:</b> english_us_arpa vs english_mfa, plus a corpus-adapted model (<span class="mono">mfa adapt</span>).</li>
+<li><b>Multiple acoustic models:</b> english_us_arpa vs english_mfa, a corpus-adapted model (<span class="mono">mfa adapt</span>), and a model trained from scratch on the corpus (<span class="mono">mfa train</span>).</li>
 <li><b>Automation:</b> <span class="mono">python scripts/run_pipeline.py</span> runs everything from the raw provided files to tables and plots. Every MFA call is logged.</li>
 <li><b>Beyond the brief:</b> quantitative model-agreement metrics, minimum-duration diagnostics, and a learner-variant probe validated with formant analysis.</li>
 </ul>

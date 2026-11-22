@@ -68,5 +68,16 @@
     "min_duration_phones_pct": 0.0,
     "long_phones": 2,
     "mean_phone_ms": 136.6
+  },
+  "G_scratch_trained_g2pdict": {
+    "utterances_aligned": "6/6",
+    "missing": [],
+    "words": 243,
+    "unknown_words": 0,
+    "spn_phones": 0,
+    "phones": 1055,
+    "min_duration_phones_pct": 66.2,
+    "long_phones": 51,
+    "mean_phone_ms": 69.8
   }
 }
